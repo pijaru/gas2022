@@ -4,6 +4,8 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
+use Illuminate\Support\Facades\Gate;
 use PHPUnit\Framework\MockObject\Stub\ReturnStub;
 
 class CategoryController extends Controller
@@ -13,6 +15,18 @@ class CategoryController extends Controller
      *
      * @return \Illuminate\Http\Response
      */
+
+    public function __construct()
+    {
+        $this->middleware(function($request, $next){
+
+            if(Gate::allows('manage-categories')) return $next($request);
+          
+            abort(403, 'Anda tidak memiliki cukup hak akses');
+          });
+    }  
+
+
     public function index(Request $request)
     {
         $categories = \App\Models\Category::paginate(10);
@@ -44,6 +58,11 @@ class CategoryController extends Controller
      */
     public function store(Request $request)
     {
+        \Validator::make($request->all(), [
+            "name" => "required|min:3|max:20",
+            "image" => "required"
+          ])->validate();
+
           $name = $request->get('name');
 
   $new_category = new \App\Models\Category;
@@ -96,6 +115,17 @@ class CategoryController extends Controller
      */
     public function update(Request $request, $id)
     {
+        $category = \App\Models\Category::findOrFail($id);
+
+        \Validator::make($request->all(), [
+            "name" => "required|min:3|max:20",
+            "image" => "required",
+            "slug" => [
+              "required",
+              Rule::unique("categories")->ignore($category->slug, "slug")
+            ]
+          ])->validate();
+        
         $name = $request->get('name');
         $slug = $request->get('slug');
 
@@ -166,4 +196,13 @@ class CategoryController extends Controller
   }
 
     }
+    
+    public function ajaxSearch(Request $request){
+    $keyword = $request->get('q');
+    
+    $categories = \App\Models\Category::where("name", "LIKE", "%$keyword%")->get();
+
+    return $categories;
+    
+}
 }
